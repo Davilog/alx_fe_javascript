@@ -1,4 +1,4 @@
-// Dynamic Quote Generator with Local Storage, Session Storage, and JSON Import/Export
+// Dynamic Quote Generator with Category Filtering, Local/Session Storage, and JSON Import/Export
 (() => {
   "use strict";
 
@@ -10,16 +10,16 @@
     { text: "Success is not in what you have, but who you are.", category: "Success" }
   ];
 
-  // Use let because we replace it after loading from storage.
   let quotes = [];
 
   // ---- DOM Refs ----
-  const quoteDisplay   = document.getElementById("quoteDisplay");
-  const newQuoteBtn    = document.getElementById("newQuote");
-  const exportBtn      = document.getElementById("exportBtn");
-  const importInput    = document.getElementById("importFile");
-  const clearBtn       = document.getElementById("clearStorage");
-  const formContainer  = document.getElementById("formContainer") || document.body;
+  const quoteDisplay  = document.getElementById("quoteDisplay");
+  const newQuoteBtn   = document.getElementById("newQuote");
+  const exportBtn     = document.getElementById("exportQuotes");
+  const importInput   = document.getElementById("importFile");
+  const clearBtn      = document.getElementById("clearStorage");
+  const formContainer = document.getElementById("formContainer") || document.body;
+  const categorySel   = document.getElementById("categoryFilter");
 
   // ---- Local Storage Helpers ----
   function loadQuotes() {
@@ -28,7 +28,6 @@
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Basic validation: each item should have text & category strings
           quotes = parsed.filter(q => q && typeof q.text === "string" && typeof q.category === "string");
           if (quotes.length === 0) quotes = DEFAULT_QUOTES.slice();
         } else {
@@ -37,8 +36,7 @@
       } else {
         quotes = DEFAULT_QUOTES.slice();
       }
-    } catch (err) {
-      console.warn("Failed to load quotes from localStorage:", err);
+    } catch {
       quotes = DEFAULT_QUOTES.slice();
     }
   }
@@ -46,42 +44,61 @@
   function saveQuotes() {
     try {
       localStorage.setItem("quotes", JSON.stringify(quotes));
-    } catch (err) {
-      console.warn("Failed to save quotes to localStorage:", err);
-    }
+    } catch {}
   }
 
-  // ---- Rendering ----
-  function renderQuote(q) {
-    if (!q) return;
-    quoteDisplay.innerHTML = "";
+  // Persist last selected category
+  function saveLastCategory(val) {
+    try { localStorage.setItem("lastSelectedCategory", val); } catch {}
+  }
+  function loadLastCategory() {
+    try { return localStorage.getItem("lastSelectedCategory") || "all"; } catch { return "all"; }
+  }
 
+  // ---- Rendering helpers ----
+  function renderSingleQuote(q) {
+    quoteDisplay.innerHTML = "";
+    if (!q) return;
     const p = document.createElement("p");
     p.textContent = `"${q.text}"`;
-
     const span = document.createElement("span");
     span.textContent = ` - ${q.category}`;
     span.style.fontStyle = "italic";
     span.style.color = "gray";
+    quoteDisplay.append(p, span);
+  }
 
-    quoteDisplay.appendChild(p);
-    quoteDisplay.appendChild(span);
+  function renderQuoteList(list) {
+    quoteDisplay.innerHTML = "";
+    if (!list || list.length === 0) {
+      quoteDisplay.textContent = "No quotes match this category.";
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    list.forEach(q => {
+      const wrap = document.createElement("div");
+      const p = document.createElement("p");
+      p.textContent = `"${q.text}"`;
+      const span = document.createElement("span");
+      span.textContent = ` - ${q.category}`;
+      span.style.fontStyle = "italic";
+      span.style.color = "gray";
+      wrap.append(p, span);
+      frag.appendChild(wrap);
+    });
+    quoteDisplay.appendChild(frag);
   }
 
   // ---- Show Random + Session Storage ----
   function showRandomQuote() {
     if (!quotes.length) return;
-    const index = Math.floor(Math.random() * quotes.length);
-    const q = quotes[index];
-    renderQuote(q);
-
-    // Save "last viewed quote" to sessionStorage (optional requirement)
+    const idx = Math.floor(Math.random() * quotes.length);
+    const q = quotes[idx];
+    renderSingleQuote(q);
     try {
-      sessionStorage.setItem("lastViewedQuoteIndex", String(index));
+      sessionStorage.setItem("lastViewedQuoteIndex", String(idx));
       sessionStorage.setItem("lastViewedQuote", JSON.stringify(q));
-    } catch (err) {
-      // Ignore session storage errors
-    }
+    } catch {}
   }
 
   function restoreLastViewedQuote() {
@@ -90,15 +107,58 @@
       if (idxStr !== null) {
         const idx = Number(idxStr);
         if (!Number.isNaN(idx) && idx >= 0 && idx < quotes.length) {
-          renderQuote(quotes[idx]);
+          renderSingleQuote(quotes[idx]);
           return;
         }
       }
-    } catch {
-      // ignore
-    }
-    // Fallback
+    } catch {}
     showRandomQuote();
+  }
+
+  // ---- Categories & Filtering ----
+  function getUniqueCategories() {
+    const set = new Set(quotes.map(q => q.category.trim()).filter(Boolean));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }
+
+  function populateCategories() {
+    if (!categorySel) return;
+    // preserve current selection if possible
+    const current = categorySel.value || loadLastCategory();
+
+    // Reset options (keep "All Categories" as the first)
+    categorySel.innerHTML = "";
+    const allOpt = document.createElement("option");
+    allOpt.value = "all";
+    allOpt.textContent = "All Categories";
+    categorySel.appendChild(allOpt);
+
+    // Add unique categories
+    getUniqueCategories().forEach(cat => {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.textContent = cat;
+      categorySel.appendChild(opt);
+    });
+
+    // Restore last or current
+    const toSelect = current && [...categorySel.options].some(o => o.value === current) ? current : "all";
+    categorySel.value = toSelect;
+    saveLastCategory(toSelect);
+  }
+
+  function filterQuotes() {
+    if (!categorySel) return;
+    const value = categorySel.value;
+    saveLastCategory(value);
+
+    if (value === "all") {
+      // Show a single random quote when "all" is selected
+      showRandomQuote();
+    } else {
+      const filtered = quotes.filter(q => q.category === value);
+      renderQuoteList(filtered);
+    }
   }
 
   // ---- Adding Quotes ----
@@ -119,7 +179,12 @@
     quotes.push(newQuote);
     saveQuotes();
 
-    renderQuote(newQuote);
+    // Update categories dropdown (in case it's a new category)
+    populateCategories();
+
+    // Refresh view according to current filter
+    filterQuotes();
+
     textInput.value = "";
     categoryInput.value = "";
     alert("Quote added successfully!");
@@ -146,7 +211,7 @@
     categoryInput.required = true;
 
     const submitBtn = document.createElement("button");
-    submitBtn.type = "button"; // prevent default submit
+    submitBtn.type = "button";
     submitBtn.textContent = "Add Quote";
     submitBtn.addEventListener("click", addQuote);
 
@@ -173,7 +238,7 @@
     URL.revokeObjectURL(url);
   }
 
-  // ---- JSON Import (kept compatible with inline onchange in HTML) ----
+  // ---- JSON Import ----
   function importFromJsonFile(event) {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
@@ -182,25 +247,20 @@
     fileReader.onload = function (e) {
       try {
         const imported = JSON.parse(e.target.result);
-
         if (!Array.isArray(imported)) {
           alert("Invalid JSON format. Expected an array of quotes.");
           return;
         }
-
-        // Validate & keep only valid items
         const cleaned = imported.filter(q => q && typeof q.text === "string" && typeof q.category === "string");
-
         if (cleaned.length === 0) {
           alert("No valid quotes found in the file.");
           return;
         }
-
         quotes.push(...cleaned);
         saveQuotes();
+        populateCategories();
         alert("Quotes imported successfully!");
-        showRandomQuote();
-        // reset file input so same file can be re-imported if needed
+        filterQuotes();
         if (importInput) importInput.value = "";
       } catch (err) {
         alert("Failed to import JSON: " + err.message);
@@ -209,32 +269,46 @@
     fileReader.readAsText(file);
   }
 
-  // Expose functions that are used by inline handlers (or tests/checkers)
+  // Expose functions for inline handlers/checkers
   window.importFromJsonFile = importFromJsonFile;
   window.addQuote = addQuote;
   window.showRandomQuote = showRandomQuote;
   window.createAddQuoteForm = createAddQuoteForm;
+  window.populateCategories = populateCategories;
+  window.filterQuotes = filterQuotes;
 
   // ---- Init ----
   loadQuotes();
   createAddQuoteForm();
+  populateCategories();
 
-  if (newQuoteBtn) newQuoteBtn.addEventListener("click", showRandomQuote);
-  if (exportBtn)   exportBtn.addEventListener("click", exportToJson);
-  // HTML already has inline onchange, but add a listener too if not present
-  if (importInput && !importInput.hasAttribute("onchange")) {
-    importInput.addEventListener("change", importFromJsonFile);
-  }
+  if (newQuoteBtn) newQuoteBtn.addEventListener("click", () => {
+    // If a specific category is active, show from that category list; else random
+    const sel = categorySel ? categorySel.value : "all";
+    if (sel === "all") showRandomQuote();
+    else filterQuotes();
+  });
+
+  if (exportBtn) exportBtn.addEventListener("click", exportToJson);
+
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
       localStorage.removeItem("quotes");
+      // don't clear lastSelectedCategory to show persistence of preference even when quotes reset
       quotes = DEFAULT_QUOTES.slice();
       saveQuotes();
+      populateCategories();
       alert("Local storage cleared. Defaults restored.");
-      showRandomQuote();
+      filterQuotes();
     });
   }
 
-  // Show last viewed quote for the session if available; otherwise random
-  restoreLastViewedQuote();
+  if (importInput && !importInput.hasAttribute("onchange")) {
+    importInput.addEventListener("change", importFromJsonFile);
+  }
+
+  // Restore last filter and render accordingly
+  const lastCat = loadLastCategory();
+  if (categorySel) categorySel.value = lastCat;
+  filterQuotes(); // will show list for a category or a random when "all"
 })();
