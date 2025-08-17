@@ -135,7 +135,7 @@ async function syncQuotes() {
     quotes = Array.from(new Map(quotes.map(q => [q.text, q])).values()); // remove duplicates
     saveQuotes();
     populateCategories();
-    notifyUser("Quotes synced with server. Conflicts resolved.");
+    notifyUser("Quotes synced with server!");
   }
 }
 
