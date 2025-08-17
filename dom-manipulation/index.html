@@ -9,25 +9,35 @@
     h1 { margin-top: 0; }
     #quoteDisplay p { font-size: 1.2rem; margin: 0 0 4px; }
     #quoteDisplay span { font-size: 0.95rem; }
-    .controls, .io, #formContainer { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
-    button, input[type="file"], input[type="text"] { padding: 8px 12px; }
+    .controls, .io, #formContainer, .filterRow { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+    button, select, input[type="file"], input[type="text"] { padding: 8px 12px; }
     form#addQuoteForm input { min-width: 260px; }
   </style>
 </head>
 <body>
   <h1>Dynamic Quote Generator</h1>
 
+  <!-- Filter Row -->
+  <div class="filterRow">
+    <label for="categoryFilter"><strong>Filter by category:</strong></label>
+    <select id="categoryFilter" onchange="filterQuotes()">
+      <option value="all">All Categories</option>
+      <!-- Dynamically populated categories -->
+    </select>
+  </div>
+
+  <!-- Quote Display -->
   <div id="quoteDisplay" aria-live="polite"></div>
 
+  <!-- Controls -->
   <div class="controls">
     <button id="newQuote">Show New Quote</button>
-    <button id="exportBtn">Export to JSON</button>
     <button id="exportQuotes">Export Quotes</button>
     <button id="clearStorage">Clear Local Storage</button>
   </div>
 
+  <!-- JSON Import -->
   <div class="io">
-    <!-- JSON import (inline onchange as requested in instructions) -->
     <input type="file" id="importFile" accept=".json" onchange="importFromJsonFile(event)" />
   </div>
 
