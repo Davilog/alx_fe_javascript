@@ -149,14 +149,14 @@
 
   function filterQuotes() {
     if (!categorySel) return;
-    const value = categorySel.value;
-    saveLastCategory(value);
+    const selectedCategory = categorySel.value;
+    saveLastCategory(selectedCategory);
 
-    if (value === "all") {
+    if (selectedCategory === "all") {
       // Show a single random quote when "all" is selected
       showRandomQuote();
     } else {
-      const filtered = quotes.filter(q => q.category === value);
+       const filtered = quotes.filter(q => q.category === selectedCategory);
       renderQuoteList(filtered);
     }
   }
